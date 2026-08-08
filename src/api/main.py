@@ -63,7 +63,7 @@ class PatientDataInput(BaseModel):
     fasting_bs: float = Field(115.0, ge=50, le=400)
     resting_ecg: str = Field("Normal")
     max_hr: float = Field(142.0, ge=60, le=220)
-    exercise_angina: str = Field("Yes", regex="^(Yes|No)$")
+    exercise_angina: str = Field("Yes", pattern="^(Yes|No)$")
     oldpeak: float = Field(1.8, ge=0.0, le=10.0)
     st_slope: str = Field("Flat")
     bmi: float = Field(29.4, ge=12.0, le=60.0)
