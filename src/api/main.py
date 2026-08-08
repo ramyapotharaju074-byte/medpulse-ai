@@ -56,7 +56,7 @@ def startup_event():
 
 class PatientDataInput(BaseModel):
     age: int = Field(54, ge=18, le=100)
-    sex: str = Field("Male", regex="^(Male|Female)$")
+    sex: str = Field("Male",pattern="^(Male|Female)$")
     chest_pain_type: str = Field("Typical Angina")
     resting_bp: float = Field(138.0, ge=70, le=240)
     cholesterol: float = Field(245.0, ge=100, le=600)
