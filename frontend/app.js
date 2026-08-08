@@ -252,7 +252,7 @@ function initPredictorForm() {
             resting_bp: parseFloat(document.getElementById('resting_bp').value),
             cholesterol: parseFloat(document.getElementById('cholesterol').value),
             fasting_bs: parseFloat(document.getElementById('fasting_bs').value),
-            resting_ecg: document.getElementById('resting_ecg').value),
+            resting_ecg: document.getElementById('resting_ecg').value,
             max_hr: parseFloat(document.getElementById('max_hr').value),
             exercise_angina: document.getElementById('exercise_angina').value,
             oldpeak: parseFloat(document.getElementById('oldpeak').value),
