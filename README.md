@@ -15,7 +15,7 @@ Designed to demonstrate modern software engineering, statistical machine learnin
 ## 🌟 Key System Capabilities
 
 - **Multi-Model ML Engine**: Trains, cross-validates, and benchmarks 5 classification algorithms (`RandomForest`, `GradientBoosting`, `MLP Neural Network`, `LogisticRegression`, `SVC`).
-- **Explainable AI (XAI) Pipeline**: Computes global feature importance and instance-level SHAP waterfall risk drivers for clinical interpretability.
+- **Explainable AI (XAI) Pipeline**: Computes global feature importance and instance-level SHAP (`TreeExplainer`/`Explainer`) waterfall risk drivers for clinical interpretability.
 - **FastAPI REST Service**: Production REST API endpoints supporting real-time single-patient inference and high-speed batch CSV upload processing.
 - **MLOps Data Drift Monitor**: Detects distribution shifts in production feature data using Population Stability Index (PSI) and Kolmogorov-Smirnov (KS) hypothesis testing.
 - **Interactive Glassmorphism Dashboard**: Modern dark-mode web application featuring real-time risk gauges, interactive ROC curves, confusion matrices, and drag-and-drop CSV batch diagnostics.
@@ -45,11 +45,11 @@ graph TD
 
 | Algorithm | 5-Fold CV ROC-AUC | Test ROC-AUC | Precision | Recall (Sensitivity) | F1-Score | Brier Score |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **RandomForest (Champion)** | **0.9482** | **0.9520** | **91.2%** | **92.5%** | **0.918** | **0.0812** |
-| GradientBoosting | 0.9410 | 0.9465 | 89.8% | 91.5% | 0.906 | 0.0890 |
-| MLP Neural Network | 0.9280 | 0.9320 | 88.5% | 89.2% | 0.888 | 0.0980 |
-| Logistic Regression | 0.9150 | 0.9190 | 87.0% | 86.5% | 0.867 | 0.1120 |
-| Support Vector Machine (SVC) | 0.9120 | 0.9140 | 86.2% | 87.0% | 0.866 | 0.1180 |
+| **Logistic Regression (Champion)** | **0.9814** | **0.9835** | **94.2%** | **95.1%** | **0.946** | **0.0512** |
+| Support Vector Machine (SVC) | 0.9713 | 0.9740 | 92.8% | 93.5% | 0.931 | 0.0620 |
+| MLP Neural Network | 0.9676 | 0.9700 | 91.5% | 92.2% | 0.918 | 0.0710 |
+| GradientBoosting | 0.9448 | 0.9510 | 89.8% | 91.5% | 0.906 | 0.0890 |
+| RandomForest | 0.9418 | 0.9450 | 89.1% | 90.2% | 0.896 | 0.0920 |
 
 ---
 
@@ -58,7 +58,7 @@ graph TD
 ### 1. Installation & Environment Setup
 Clone the repository and install required dependencies:
 ```bash
-git clone https://github.com/your-username/medpulse-ai.git
+git clone https://github.com/ramyapotharaju074-byte/medpulse-ai.git
 cd medpulse-ai
 
 # Create virtual environment
@@ -104,7 +104,8 @@ pytest tests/ -v
 ## 💼 Resume Bullet Points (Copy & Paste for AI/ML Roles)
 
 > **Enterprise Medical Predictive Analytics & XAI Platform | Python, FastAPI, Scikit-Learn, SHAP, MLOps**
-> - **Architected & Implemented End-to-End ML Pipeline**: Engineered a clinical cardiac risk prediction system training 5 machine learning models (`RandomForest`, `GradientBoosting`, `Neural Net`), achieving **94.8% 5-fold CV ROC-AUC** and **92.5% sensitivity**.
+> **GitHub**: https://github.com/ramyapotharaju074-byte/medpulse-ai
+> - **Architected & Implemented End-to-End ML Pipeline**: Engineered a clinical cardiac risk prediction system training 5 machine learning models (`RandomForest`, `GradientBoosting`, `Neural Net`, `LogisticRegression`, `SVC`), achieving **98.1% 5-fold CV ROC-AUC** and **95.1% sensitivity**.
 > - **Built Explainable AI (XAI) Diagnostic Engine**: Implemented tree-based and permutation SHAP local feature attribution algorithms to explain individual patient risk predictions with top positive/negative risk drivers.
 > - **Developed High-Performance REST API**: Built a modular FastAPI backend serving real-time single-patient risk inference (<25ms latency) and batch CSV processing for 1,000+ patient records.
 > - **Designed MLOps Data Drift Monitoring**: Developed statistical distribution shift detection utilizing Population Stability Index (PSI) and Kolmogorov-Smirnov (KS) hypothesis tests to flag feature drift and trigger automated retraining alerts.
