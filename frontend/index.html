@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedPulse AI — Enterprise Medical Predictive Analytics & XAI Platform</title>
+    <meta name="description" content="Production-grade AI medical predictive health analytics platform featuring Explainable AI (SHAP), real-time FastAPI inference, and MLOps data drift monitoring.">
+    <!-- Google Fonts & Chart.js -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+        <div class="logo-area">
+            <div class="logo-icon"><i class="fa-solid fa-heart-pulse"></i></div>
+            <div class="logo-text">
+                <h1>MedPulse <span>AI</span></h1>
+                <p>Enterprise Predictive Health & XAI Engine</p>
+            </div>
+        </div>
+        
+        <div class="header-actions">
+            <div class="status-badge" id="api-status">
+                <span class="pulse-dot green"></span> API Engine: Ready (Port 8000)
+            </div>
+            <div class="champion-badge" id="champion-badge">
+                <i class="fa-solid fa-trophy"></i> Active Model: <strong id="active-model-name">RandomForest</strong>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <nav class="nav-menu">
+                <button class="nav-btn active" data-tab="overview">
+                    <i class="fa-solid fa-chart-line"></i> Dashboard Overview
+                </button>
+                <button class="nav-btn" data-tab="predictor">
+                    <i class="fa-solid fa-user-doctor"></i> Patient Risk Predictor
+                </button>
+                <button class="nav-btn" data-tab="batch">
+                    <i class="fa-solid fa-file-csv"></i> Batch CSV Portal
+                </button>
+                <button class="nav-btn" data-tab="evaluation">
+                    <i class="fa-solid fa-brain"></i> Model Benchmarks & XAI
+                </button>
+                <button class="nav-btn" data-tab="drift">
+                    <i class="fa-solid fa-shield-halved"></i> MLOps Drift Monitor
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="tech-stack-tags">
+                    <span>Python 3.10</span>
+                    <span>FastAPI</span>
+                    <span>Scikit-Learn</span>
+                    <span>SHAP XAI</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Panel -->
+        <main class="content-panel">
+
+            <!-- TAB 1: OVERVIEW DASHBOARD -->
+            <section id="tab-overview" class="tab-content active">
+                <div class="section-title">
+                    <h2>System Analytics & Performance KPI</h2>
+                    <p>Real-time machine learning pipeline health and cross-validated benchmark performance metrics.</p>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card glass">
+                        <div class="kpi-icon blue"><i class="fa-solid fa-bullseye"></i></div>
+                        <div class="kpi-data">
+                            <span class="kpi-label">Champion ROC-AUC</span>
+                            <span class="kpi-value" id="kpi-auc">0.9482</span>
+                            <span class="kpi-sub green"><i class="fa-solid fa-arrow-trend-up"></i> Top Performing Model</span>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card glass">
+                        <div class="kpi-icon purple"><i class="fa-solid fa-layer-group"></i></div>
+                        <div class="kpi-data">
+                            <span class="kpi-label">Models Evaluated</span>
+                            <span class="kpi-value">5 Algorithms</span>
+                            <span class="kpi-sub">5-Fold Stratified CV</span>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card glass">
+                        <div class="kpi-icon emerald"><i class="fa-solid fa-shield-check"></i></div>
+                        <div class="kpi-data">
+                            <span class="kpi-label">Pipeline Calibration</span>
+                            <span class="kpi-value" id="kpi-brier">0.0812</span>
+                            <span class="kpi-sub green">Brier Score (Well Calibrated)</span>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card glass">
+                        <div class="kpi-icon amber"><i class="fa-solid fa-wave-square"></i></div>
+                        <div class="kpi-data">
+                            <span class="kpi-label">Data Drift Alert Status</span>
+                            <span class="kpi-value" id="kpi-drift">Stable</span>
+                            <span class="kpi-sub green" id="kpi-drift-sub">PSI Index &lt; 0.10</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-2-col margin-top-lg">
+                    <div class="card glass">
+                        <h3><i class="fa-solid fa-chart-column"></i> Multi-Model ROC-AUC Comparison</h3>
+                        <div class="chart-container">
+                            <canvas id="modelComparisonChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card glass">
+                        <h3><i class="fa-solid fa-chart-line"></i> Champion Model ROC Curve</h3>
+                        <div class="chart-container">
+                            <canvas id="rocCurveChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: PATIENT RISK PREDICTOR -->
+            <section id="tab-predictor" class="tab-content">
+                <div class="section-title">
+                    <h2>Interactive Clinical Patient Risk Assessment</h2>
+                    <p>Input patient diagnostic parameters to receive instant risk probability and SHAP local feature attribution breakdown.</p>
+                </div>
+
+                <div class="predictor-layout">
+                    <!-- Form Controls -->
+                    <div class="card glass predictor-form-card">
+                        <h3><i class="fa-solid fa-id-card-clip"></i> Diagnostic Parameters</h3>
+                        <form id="patient-form">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="age">Age (Years)</label>
+                                    <input type="number" id="age" value="58" min="18" max="100" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="sex">Biological Sex</label>
+                                    <select id="sex">
+                                        <option value="Male" selected>Male</option>
+                                        <option value="Female">Female</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="chest_pain_type">Chest Pain Severity</label>
+                                    <select id="chest_pain_type">
+                                        <option value="Typical Angina" selected>Typical Angina</option>
+                                        <option value="Atypical Angina">Atypical Angina</option>
+                                        <option value="Non-Anginal Pain">Non-Anginal Pain</option>
+                                        <option value="Asymptomatic">Asymptomatic</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="resting_bp">Resting BP (mm Hg)</label>
+                                    <input type="number" id="resting_bp" value="142" min="80" max="220" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="cholesterol">Cholesterol (mg/dL)</label>
+                                    <input type="number" id="cholesterol" value="268" min="100" max="500" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="fasting_bs">Fasting Blood Sugar (mg/dL)</label>
+                                    <input type="number" id="fasting_bs" value="126" min="60" max="350" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="resting_ecg">Resting ECG Result</label>
+                                    <select id="resting_ecg">
+                                        <option value="Normal">Normal</option>
+                                        <option value="ST-T Wave Abnormality" selected>ST-T Wave Abnormality</option>
+                                        <option value="Left Ventricular Hypertrophy">Left Ventricular Hypertrophy</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="max_hr">Max Heart Rate (bpm)</label>
+                                    <input type="number" id="max_hr" value="132" min="60" max="220" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="exercise_angina">Exercise Induced Angina</label>
+                                    <select id="exercise_angina">
+                                        <option value="Yes" selected>Yes</option>
+                                        <option value="No">No</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="oldpeak">ST Depression (oldpeak)</label>
+                                    <input type="number" step="0.1" id="oldpeak" value="2.2" min="0" max="8" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="st_slope">ST Slope</label>
+                                    <select id="st_slope">
+                                        <option value="Flat" selected>Flat</option>
+                                        <option value="Downsloping">Downsloping</option>
+                                        <option value="Upsloping">Upsloping</option>
+                                    </select>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="bmi">BMI (kg/m²)</label>
+                                    <input type="number" step="0.1" id="bmi" value="31.2" min="14" max="50" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="hba1c">HbA1c Level (%)</label>
+                                    <input type="number" step="0.1" id="hba1c" value="6.8" min="4" max="14" required>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn primary-btn full-width margin-top-md">
+                                <i class="fa-solid fa-microchip"></i> Calculate Patient Risk & SHAP Explanation
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Output Results Card -->
+                    <div class="card glass predictor-result-card">
+                        <h3><i class="fa-solid fa-clipboard-check"></i> Diagnostic Result & XAI Breakdown</h3>
+
+                        <div class="risk-gauge-container">
+                            <div class="gauge-meter">
+                                <div class="gauge-fill" id="gauge-fill" style="transform: rotate(0.40turn);"></div>
+                                <div class="gauge-cover">
+                                    <span class="gauge-score" id="risk-percent-text">--%</span>
+                                    <span class="gauge-title">Probability</span>
+                                </div>
+                            </div>
+
+                            <div class="risk-badge-box" id="risk-category-badge">
+                                Submit Form to Run Inference
+                            </div>
+                        </div>
+
+                        <div class="shap-breakdown-section margin-top-lg">
+                            <h4><i class="fa-solid fa-magnifying-glass-chart"></i> Top Contributing Risk Drivers (SHAP Local Explanation)</h4>
+                            <div class="drivers-list" id="drivers-list">
+                                <div class="placeholder-text">Click calculate above to generate patient-specific feature attribution explanations.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: BATCH CSV PORTAL -->
+            <section id="tab-batch" class="tab-content">
+                <div class="section-title">
+                    <h2>Batch Diagnostic CSV Processor</h2>
+                    <p>Upload multi-patient dataset files for high-speed automated risk scoring and patient stratification.</p>
+                </div>
+
+                <div class="card glass">
+                    <div class="upload-dropzone" id="dropzone">
+                        <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
+                        <h3>Drag & Drop Clinical CSV File</h3>
+                        <p>Or click to select <code>.csv</code> file containing patient parameters</p>
+                        <input type="file" id="csv-file-input" accept=".csv" hidden>
+                        <button class="btn secondary-btn margin-top-sm" id="btn-select-file">
+                            <i class="fa-solid fa-folder-open"></i> Select Sample CSV File
+                        </button>
+                    </div>
+                </div>
+
+                <div id="batch-results-container" class="margin-top-lg display-none">
+                    <div class="kpi-grid">
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon blue"><i class="fa-solid fa-users"></i></div>
+                            <div class="kpi-data">
+                                <span class="kpi-label">Total Records Processed</span>
+                                <span class="kpi-value" id="batch-total">0</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon emerald"><i class="fa-solid fa-user-check"></i></div>
+                            <div class="kpi-data">
+                                <span class="kpi-label">Low Risk Patients</span>
+                                <span class="kpi-value" id="batch-low">0</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon amber"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                            <div class="kpi-data">
+                                <span class="kpi-label">Moderate Risk Patients</span>
+                                <span class="kpi-value" id="batch-mod">0</span>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon crimson"><i class="fa-solid fa-circle-exclamation"></i></div>
+                            <div class="kpi-data">
+                                <span class="kpi-label">High Risk Alerts</span>
+                                <span class="kpi-value" id="batch-high">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card glass margin-top-lg">
+                        <h3><i class="fa-solid fa-table-list"></i> Batch Patient Risk Stratification</h3>
+                        <div class="table-responsive">
+                            <table class="data-table" id="batch-table">
+                                <thead>
+                                    <tr>
+                                        <th>Patient ID</th>
+                                        <th>Age</th>
+                                        <th>Sex</th>
+                                        <th>Risk Probability</th>
+                                        <th>Risk Category</th>
+                                        <th>Flag</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="batch-table-body">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: MODEL EVALUATION & XAI LAB -->
+            <section id="tab-evaluation" class="tab-content">
+                <div class="section-title">
+                    <h2>Model Benchmarks & Global Explainability (XAI)</h2>
+                    <p>Comparative model performance metrics and global feature importance across clinical features.</p>
+                </div>
+
+                <div class="grid-2-col">
+                    <div class="card glass">
+                        <h3><i class="fa-solid fa-chart-bar"></i> Global Feature Importance (Tree SHAP Normalized)</h3>
+                        <div class="chart-container">
+                            <canvas id="globalImportanceChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card glass">
+                        <h3><i class="fa-solid fa-square-poll-vertical"></i> Confusion Matrix (Champion Model)</h3>
+                        <div class="confusion-matrix-box" id="confusion-matrix-display">
+                            <div class="cm-cell tn"><span>True Negative (TN)</span><strong id="cm-tn">0</strong></div>
+                            <div class="cm-cell fp"><span>False Positive (FP)</span><strong id="cm-fp">0</strong></div>
+                            <div class="cm-cell fn"><span>False Negative (FN)</span><strong id="cm-fn">0</strong></div>
+                            <div class="cm-cell tp"><span>True Positive (TP)</span><strong id="cm-tp">0</strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card glass margin-top-lg">
+                    <h3><i class="fa-solid fa-table"></i> Multi-Model Benchmark Comparison Table</h3>
+                    <div class="table-responsive">
+                        <table class="data-table" id="benchmark-table">
+                            <thead>
+                                <tr>
+                                    <th>Algorithm</th>
+                                    <th>5-Fold CV AUC</th>
+                                    <th>Test ROC-AUC</th>
+                                    <th>Precision</th>
+                                    <th>Recall (Sensitivity)</th>
+                                    <th>F1 Score</th>
+                                    <th>Brier Score</th>
+                                </tr>
+                            </thead>
+                            <tbody id="benchmark-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: MLOPS DRIFT MONITOR -->
+            <section id="tab-drift" class="tab-content">
+                <div class="section-title">
+                    <h2>MLOps Data Drift & Distribution Health</h2>
+                    <p>Detect statistical population shifts using Kolmogorov-Smirnov and Population Stability Index (PSI).</p>
+                </div>
+
+                <div class="drift-controls-card card glass">
+                    <div class="drift-status-banner" id="drift-status-banner">
+                        <i class="fa-solid fa-circle-check"></i> PIPELINE HEALTHY - DATA DISTRIBUTIONS STABLE
+                    </div>
+                    <div class="drift-actions">
+                        <button class="btn secondary-btn" id="btn-run-drift-normal">
+                            <i class="fa-solid fa-arrows-rotate"></i> Test Baseline Sample
+                        </button>
+                        <button class="btn danger-btn" id="btn-run-drift-simulated">
+                            <i class="fa-solid fa-bolt-lightning"></i> Inject Simulated Population Drift (+25%)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card glass margin-top-lg">
+                    <h3><i class="fa-solid fa-magnifying-glass-chart"></i> Feature-Level Distribution Shift Analysis</h3>
+                    <div class="table-responsive">
+                        <table class="data-table" id="drift-table">
+                            <thead>
+                                <tr>
+                                    <th>Feature Name</th>
+                                    <th>Baseline Mean</th>
+                                    <th>Current Mean</th>
+                                    <th>PSI Score</th>
+                                    <th>KS Statistic</th>
+                                    <th>p-value</th>
+                                    <th>Health Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="drift-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+</body>
+</html>
