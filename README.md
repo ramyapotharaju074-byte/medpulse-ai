@@ -12,6 +12,22 @@ Designed to demonstrate modern software engineering, statistical machine learnin
 
 ---
 
+## 🖼️ Application Previews & User Interface
+
+### 1. System Analytics & Performance KPI Dashboard
+![Dashboard Overview](assets/dashboard_overview.jpg)
+
+### 2. Interactive Clinical Patient Risk Predictor & SHAP Breakdown
+![Patient Risk Predictor](assets/patient_risk_predictor.jpg)
+
+### 3. Multi-Model Evaluation & Global SHAP Feature Importance
+![Model Benchmarks and XAI](assets/model_benchmarks_xai.jpg)
+
+### 4. MLOps Data Drift & Population Shift Monitor
+![MLOps Drift Monitor](assets/mlops_drift_monitor.jpg)
+
+---
+
 ## 🌟 Key System Capabilities
 
 - **Multi-Model ML Engine**: Trains, cross-validates, and benchmarks 5 classification algorithms (`RandomForest`, `GradientBoosting`, `MLP Neural Network`, `LogisticRegression`, `SVC`).
@@ -103,8 +119,8 @@ pytest tests/ -v
 
 ## 💼 Resume Bullet Points (Copy & Paste for AI/ML Roles)
 
-> **Enterprise Medical Predictive Analytics & XAI Platform | Python, FastAPI, Scikit-Learn, SHAP, MLOps**
-> **GitHub**: https://github.com/ramyapotharaju074-byte/medpulse-ai
+> **Enterprise Medical Predictive Analytics & XAI Platform | Python, FastAPI, Scikit-Learn, SHAP, MLOps**  
+> **GitHub**: https://github.com/ramyapotharaju074-byte/medpulse-ai  
 > - **Architected & Implemented End-to-End ML Pipeline**: Engineered a clinical cardiac risk prediction system training 5 machine learning models (`RandomForest`, `GradientBoosting`, `Neural Net`, `LogisticRegression`, `SVC`), achieving **98.1% 5-fold CV ROC-AUC** and **95.1% sensitivity**.
 > - **Built Explainable AI (XAI) Diagnostic Engine**: Implemented tree-based and permutation SHAP local feature attribution algorithms to explain individual patient risk predictions with top positive/negative risk drivers.
 > - **Developed High-Performance REST API**: Built a modular FastAPI backend serving real-time single-patient risk inference (<25ms latency) and batch CSV processing for 1,000+ patient records.
