@@ -101,26 +101,12 @@ background_data = None
 # =========================================================
 
 def get_loaded_artifacts():
-    """
-    Load all required MedPulse AI artifacts.
-
-    Loads:
-        1. Preprocessor
-        2. Champion model
-        3. Transformed feature names
-        4. Baseline/raw dataset
-        5. SHAP background data
-    """
 
     global preprocessor
     global champion_model
     global feature_names
     global baseline_df
     global background_data
-
-    # -----------------------------------------------------
-    # Avoid loading repeatedly
-    # -----------------------------------------------------
 
     if (
         preprocessor is not None
@@ -133,9 +119,9 @@ def get_loaded_artifacts():
 
         print("[INFO] Loading MedPulse AI artifacts...")
 
-        # =================================================
+        # -------------------------------------------------
         # 1. LOAD PREPROCESSOR
-        # =================================================
+        # -------------------------------------------------
 
         preprocessor = load_preprocessor()
 
@@ -148,9 +134,9 @@ def get_loaded_artifacts():
             "[INFO] Preprocessor loaded successfully."
         )
 
-        # =================================================
+        # -------------------------------------------------
         # 2. LOAD CHAMPION MODEL
-        # =================================================
+        # -------------------------------------------------
 
         model_path = (
             config.MODELS_DIR
@@ -158,14 +144,18 @@ def get_loaded_artifacts():
         )
 
         if not model_path.exists():
+
             raise FileNotFoundError(
                 "Champion model not found at: "
                 f"{model_path}"
             )
 
-        champion_model = joblib.load(model_path)
+        champion_model = joblib.load(
+            model_path
+        )
 
         if champion_model is None:
+
             raise RuntimeError(
                 "Champion model was loaded as None."
             )
@@ -174,9 +164,9 @@ def get_loaded_artifacts():
             "[INFO] Champion model loaded successfully."
         )
 
-        # =================================================
+        # -------------------------------------------------
         # 3. GET FEATURE NAMES
-        # =================================================
+        # -------------------------------------------------
 
         feature_names = get_transformed_feature_names(
             preprocessor
@@ -186,6 +176,7 @@ def get_loaded_artifacts():
             feature_names is None
             or len(feature_names) == 0
         ):
+
             raise RuntimeError(
                 "Could not obtain transformed feature names."
             )
@@ -195,11 +186,12 @@ def get_loaded_artifacts():
             f"{len(feature_names)}"
         )
 
-        # =================================================
+        # -------------------------------------------------
         # 4. LOAD RAW DATASET
-        # =================================================
+        # -------------------------------------------------
 
         if not config.RAW_DATA_PATH.exists():
+
             raise FileNotFoundError(
                 "Raw medical dataset not found at: "
                 f"{config.RAW_DATA_PATH}"
@@ -210,6 +202,7 @@ def get_loaded_artifacts():
         )
 
         if baseline_df.empty:
+
             raise RuntimeError(
                 "The raw medical dataset is empty."
             )
@@ -220,9 +213,9 @@ def get_loaded_artifacts():
             f"{len(baseline_df.columns)} columns."
         )
 
-        # =================================================
+        # -------------------------------------------------
         # 5. CHECK FEATURE COLUMNS
-        # =================================================
+        # -------------------------------------------------
 
         missing_columns = [
             column
@@ -231,14 +224,15 @@ def get_loaded_artifacts():
         ]
 
         if missing_columns:
+
             raise ValueError(
                 "Required feature columns are missing "
                 f"from the dataset: {missing_columns}"
             )
 
-        # =================================================
+        # -------------------------------------------------
         # 6. CREATE SHAP BACKGROUND DATA
-        # =================================================
+        # -------------------------------------------------
 
         background_raw = (
             baseline_df[
@@ -255,6 +249,7 @@ def get_loaded_artifacts():
         )
 
         if background_raw.empty:
+
             raise RuntimeError(
                 "SHAP background dataset could not be created."
             )
@@ -264,15 +259,16 @@ def get_loaded_artifacts():
             f"{len(background_raw)}"
         )
 
-        # =================================================
+        # -------------------------------------------------
         # 7. APPLY SAME PREPROCESSING
-        # =================================================
+        # -------------------------------------------------
 
         background_data = preprocessor.transform(
             background_raw
         )
 
         if background_data is None:
+
             raise RuntimeError(
                 "SHAP background data transformation failed."
             )
@@ -281,21 +277,24 @@ def get_loaded_artifacts():
             "[INFO] SHAP background data prepared successfully."
         )
 
-        # =================================================
+        # -------------------------------------------------
         # 8. FINAL VALIDATION
-        # =================================================
+        # -------------------------------------------------
 
         if preprocessor is None:
+
             raise RuntimeError(
                 "Preprocessor validation failed."
             )
 
         if champion_model is None:
+
             raise RuntimeError(
                 "Champion model validation failed."
             )
 
         if background_data is None:
+
             raise RuntimeError(
                 "SHAP background data validation failed."
             )
@@ -360,8 +359,15 @@ def get_loaded_artifacts():
 
 @app.on_event("startup")
 def startup_event():
-    print("[INFO] MedPulse AI API started successfully.")
-    print("[INFO] Model artifacts will be loaded when required.")
+
+    print(
+        "[INFO] MedPulse AI API started successfully."
+    )
+
+    print(
+        "[INFO] Model artifacts will be loaded when required."
+    )
+
 
 # =========================================================
 # PATIENT INPUT MODEL
@@ -485,6 +491,30 @@ def health_check():
 
 
 # =========================================================
+# API INFORMATION
+# =========================================================
+
+@app.get("/api/info")
+def api_info():
+
+    return {
+        "service": "MedPulse AI Analytics Engine",
+        "version": "1.0.0",
+        "status": "online",
+        "endpoints": [
+            "/",
+            "/health",
+            "/api/info",
+            "/api/predict",
+            "/api/predict-batch",
+            "/api/explain/global",
+            "/api/drift",
+            "/docs"
+        ]
+    }
+
+
+# =========================================================
 # SINGLE PATIENT PREDICTION
 # =========================================================
 
@@ -501,6 +531,7 @@ def predict_single_patient(
             champion_model is None
             or preprocessor is None
         ):
+
             raise HTTPException(
                 status_code=500,
                 detail=(
@@ -531,7 +562,7 @@ def predict_single_patient(
             patient_dict = patient.dict()
 
         # -------------------------------------------------
-        # DataFrame
+        # Create DataFrame
         # -------------------------------------------------
 
         df_single = pd.DataFrame(
@@ -637,7 +668,7 @@ async def predict_batch_csv(
             )
 
         # -------------------------------------------------
-        # Read file
+        # Read uploaded file
         # -------------------------------------------------
 
         content = await file.read()
@@ -703,7 +734,7 @@ async def predict_batch_csv(
             )
 
         # -------------------------------------------------
-        # Select features
+        # Select model features
         # -------------------------------------------------
 
         batch_features = df_batch[
@@ -770,29 +801,58 @@ async def predict_batch_csv(
                 risk_level = "High"
                 high_cnt += 1
 
+            # -------------------------------------------------
+            # IMPORTANT FIX:
+            # Return Age and Sex from uploaded CSV
+            # -------------------------------------------------
+
+            age_value = df_batch.iloc[index]["age"]
+            sex_value = df_batch.iloc[index]["sex"]
+
+            # Convert NumPy values to normal Python values
+            if pd.isna(age_value):
+                age_value = None
+            else:
+                age_value = int(age_value)
+
+            if pd.isna(sex_value):
+                sex_value = None
+            else:
+                sex_value = str(sex_value)
+
             results.append(
                 {
                     "row": int(index + 1),
+
+                    "age": age_value,
+
+                    "sex": sex_value,
+
                     "risk_probability": round(
                         probability,
                         4
                     ),
+
                     "risk_percentage": round(
                         percentage,
                         2
                     ),
+
                     "risk_level": risk_level
                 }
             )
 
         return {
             "status": "success",
+
             "total_records": len(results),
+
             "summary": {
                 "low_risk": low_cnt,
                 "moderate_risk": mod_cnt,
                 "high_risk": high_cnt
             },
+
             "results": results
         }
 
@@ -840,14 +900,8 @@ def global_explanation():
 
             raise HTTPException(
                 status_code=500,
-                detail=(
-                    "SHAP background data is not loaded."
-                )
+                detail="SHAP background data not loaded."
             )
-
-        # -------------------------------------------------
-        # Calculate global importance
-        # -------------------------------------------------
 
         importance = get_global_feature_importance(
             champion_model,
@@ -867,14 +921,14 @@ def global_explanation():
     except Exception as e:
 
         print(
-            "[ERROR] Global explanation failed: "
+            "[ERROR] Global explainability failed: "
             f"{e}"
         )
 
         raise HTTPException(
             status_code=500,
             detail=(
-                "Global explanation failed: "
+                "Global explainability failed: "
                 f"{str(e)}"
             )
         )
@@ -885,7 +939,7 @@ def global_explanation():
 # =========================================================
 
 @app.post("/api/drift")
-async def dataset_drift(
+async def drift_monitor(
     file: UploadFile = File(...)
 ):
 
@@ -893,12 +947,9 @@ async def dataset_drift(
 
         get_loaded_artifacts()
 
-        if baseline_df is None:
-
-            raise HTTPException(
-                status_code=500,
-                detail="Baseline dataset is not loaded."
-            )
+        # -------------------------------------------------
+        # Validate filename
+        # -------------------------------------------------
 
         if not file.filename:
 
@@ -913,6 +964,10 @@ async def dataset_drift(
                 status_code=400,
                 detail="File must be a CSV format."
             )
+
+        # -------------------------------------------------
+        # Read uploaded CSV
+        # -------------------------------------------------
 
         content = await file.read()
 
@@ -931,45 +986,96 @@ async def dataset_drift(
                 )
             )
 
+        except UnicodeDecodeError:
+
+            raise HTTPException(
+                status_code=400,
+                detail="CSV file must use UTF-8 encoding."
+            )
+
         except Exception as e:
 
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    f"Could not read CSV file: {e}"
-                )
+                detail=f"Could not read CSV file: {e}"
             )
 
         if current_df.empty:
 
             raise HTTPException(
                 status_code=400,
-                detail="Uploaded dataset is empty."
+                detail="CSV file contains no records."
             )
 
         # -------------------------------------------------
-        # Run existing drift monitor
+        # Required drift columns
+        # -------------------------------------------------
+
+        drift_features = [
+            "age",
+            "resting_bp",
+            "cholesterol",
+            "fasting_bs",
+            "max_hr",
+            "oldpeak",
+            "bmi",
+            "hba1c"
+        ]
+
+        missing_columns = [
+            column
+            for column in drift_features
+            if column not in current_df.columns
+        ]
+
+        if missing_columns:
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Missing required drift columns: "
+                    f"{missing_columns}"
+                )
+            )
+
+        # -------------------------------------------------
+        # Baseline data
+        # -------------------------------------------------
+
+        if baseline_df is None:
+
+            raise HTTPException(
+                status_code=500,
+                detail="Baseline dataset is not loaded."
+            )
+
+        # -------------------------------------------------
+        # Analyze drift
         # -------------------------------------------------
 
         try:
 
             drift_result = analyze_dataset_drift(
-                baseline_df,
-                current_df
+                baseline_df[
+                    drift_features
+                ],
+                current_df[
+                    drift_features
+                ]
             )
 
         except TypeError:
 
-            # Compatibility with implementations that
-            # expect only feature columns.
+            # Compatibility fallback if the monitoring
+            # function accepts feature lists/configuration.
             drift_result = analyze_dataset_drift(
-                baseline_df[
-                    config.FEATURE_COLUMNS
-                ],
-                current_df[
-                    config.FEATURE_COLUMNS
-                ]
+                baseline_df,
+                current_df
             )
+
+        # -------------------------------------------------
+        # Return standardized response
+        # -------------------------------------------------
 
         return {
             "status": "success",
@@ -982,7 +1088,7 @@ async def dataset_drift(
     except Exception as e:
 
         print(
-            "[ERROR] Drift analysis failed: "
+            "[ERROR] Drift monitoring failed: "
             f"{e}"
         )
 
@@ -993,46 +1099,3 @@ async def dataset_drift(
                 f"{str(e)}"
             )
         )
-
-
-# =========================================================
-# API INFORMATION
-# =========================================================
-
-@app.get("/api/info")
-def api_info():
-
-    return {
-        "project": "MedPulse AI",
-        "version": "1.0.0",
-        "description": (
-            "Clinical Cardiac Risk Prediction, "
-            "Explainable AI and MLOps Drift Monitoring"
-        ),
-        "endpoints": [
-            "/",
-            "/health",
-            "/api/info",
-            "/api/predict",
-            "/api/predict-batch",
-            "/api/explain/global",
-            "/api/drift",
-            "/docs"
-        ]
-    }
-
-
-# =========================================================
-# LOCAL DEVELOPMENT
-# =========================================================
-
-if __name__ == "__main__":
-
-    import uvicorn
-
-    uvicorn.run(
-        "src.api.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
-    )
