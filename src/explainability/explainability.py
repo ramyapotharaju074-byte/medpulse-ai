@@ -7,9 +7,9 @@ import pandas as pd
 import shap
 
 
-# ------------------------------------------------------------
+# ============================================================
 # PROJECT PATH
-# ------------------------------------------------------------
+# ============================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -20,9 +20,9 @@ if str(PROJECT_ROOT) not in sys.path:
 from src import config
 
 
-# ------------------------------------------------------------
+# ============================================================
 # FEATURE NAME MAPPING
-# ------------------------------------------------------------
+# ============================================================
 
 def _get_original_feature(feature_name: str) -> str:
     """
@@ -44,9 +44,9 @@ def _get_original_feature(feature_name: str) -> str:
     return feature_name
 
 
-# ------------------------------------------------------------
+# ============================================================
 # SHAP EXPLAINER
-# ------------------------------------------------------------
+# ============================================================
 
 def _get_shap_explainer(
     model,
@@ -54,10 +54,18 @@ def _get_shap_explainer(
     feature_names
 ):
     """
-    Creates a SHAP explainer for the trained model.
+    Creates a SHAP explainer compatible with different
+    classification models.
 
-    The background data must already be transformed using
-    the same preprocessing pipeline used during training.
+    Tree-based models:
+        Uses TreeExplainer.
+
+    Other models such as:
+        MLPClassifier
+        LogisticRegression
+        SVC
+
+    are explained through model.predict_proba().
     """
 
     if background_data is None:
@@ -65,32 +73,82 @@ def _get_shap_explainer(
             "background_data is required for SHAP explanations."
         )
 
+    background_data = np.asarray(background_data)
+
+    # --------------------------------------------------------
+    # TREE-BASED MODELS
+    # --------------------------------------------------------
+
+    tree_model_names = {
+        "RandomForestClassifier",
+        "GradientBoostingClassifier",
+        "XGBClassifier",
+        "LGBMClassifier",
+        "CatBoostClassifier"
+    }
+
+    model_name = model.__class__.__name__
+
+    if model_name in tree_model_names:
+
+        try:
+            return shap.TreeExplainer(model)
+        except Exception:
+            pass
+
+    # --------------------------------------------------------
+    # GENERAL CLASSIFICATION MODELS
+    # --------------------------------------------------------
+    # This includes MLPClassifier.
+    #
+    # SHAP receives a callable function rather than the model
+    # object directly.
+
+    def predict_function(X):
+        X = np.asarray(X)
+
+        probabilities = model.predict_proba(X)
+
+        # Return probability of positive/risk class
+        return probabilities[:, 1]
+
     return shap.Explainer(
-        model,
+        predict_function,
         background_data,
         feature_names=feature_names
     )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # SAFE SHAP VALUE EXTRACTION
-# ------------------------------------------------------------
+# ============================================================
 
 def _extract_shap_values(
     shap_output,
     class_index: int = 1
 ):
     """
-    Extracts SHAP values for the positive/risk class.
+    Safely extracts SHAP values.
 
-    Handles different SHAP output shapes:
+    Supported formats:
+
         (samples, features)
+
         (samples, features, classes)
+
+        list of arrays
+
+        (features,)
     """
 
     values = shap_output.values
 
+    # --------------------------------------------------------
+    # LIST FORMAT
+    # --------------------------------------------------------
+
     if isinstance(values, list):
+
         if len(values) > class_index:
             values = values[class_index]
         else:
@@ -98,20 +156,38 @@ def _extract_shap_values(
 
     values = np.asarray(values)
 
+    # --------------------------------------------------------
+    # 3D FORMAT
+    # --------------------------------------------------------
+
     if values.ndim == 3:
+
         return values[:, :, class_index]
 
+    # --------------------------------------------------------
+    # 2D FORMAT
+    # --------------------------------------------------------
+
     if values.ndim == 2:
+
         return values
+
+    # --------------------------------------------------------
+    # 1D FORMAT
+    # --------------------------------------------------------
+
+    if values.ndim == 1:
+
+        return values.reshape(1, -1)
 
     raise ValueError(
         f"Unexpected SHAP output shape: {values.shape}"
     )
 
 
-# ------------------------------------------------------------
+# ============================================================
 # GLOBAL FEATURE IMPORTANCE
-# ------------------------------------------------------------
+# ============================================================
 
 def get_global_feature_importance(
     model,
@@ -130,7 +206,6 @@ def get_global_feature_importance(
 
     preprocessor:
         Training preprocessing pipeline.
-        Kept for API compatibility.
 
     feature_names:
         Names of transformed features.
@@ -139,43 +214,76 @@ def get_global_feature_importance(
         Transformed background dataset.
     """
 
+    # --------------------------------------------------------
+    # VALIDATION
+    # --------------------------------------------------------
+
     if background_data is None:
+
         raise ValueError(
             "background_data is required for SHAP "
             "global explanations."
         )
 
     if feature_names is None:
+
         raise ValueError(
             "feature_names is required for SHAP "
             "global explanations."
         )
 
-    # Create SHAP explainer
+    if model is None:
+
+        raise ValueError(
+            "model is required for SHAP "
+            "global explanations."
+        )
+
+    # --------------------------------------------------------
+    # CREATE SHAP EXPLAINER
+    # --------------------------------------------------------
+
     explainer = _get_shap_explainer(
-        model,
-        background_data,
-        feature_names
+        model=model,
+        background_data=background_data,
+        feature_names=feature_names
     )
 
-    # Calculate SHAP values
-    shap_output = explainer(background_data)
+    # --------------------------------------------------------
+    # CALCULATE SHAP VALUES
+    # --------------------------------------------------------
 
-    # Extract positive/risk-class SHAP values
+    shap_output = explainer(
+        np.asarray(background_data)
+    )
+
     values = _extract_shap_values(
         shap_output,
         class_index=1
     )
 
-    # Mean absolute SHAP value
+    # --------------------------------------------------------
+    # MEAN ABSOLUTE SHAP
+    # --------------------------------------------------------
+
     mean_abs_shap = np.abs(values).mean(axis=0)
 
-    # Normalize importance
-    total = float(mean_abs_shap.sum())
+    # --------------------------------------------------------
+    # NORMALIZE
+    # --------------------------------------------------------
+
+    total = float(
+        mean_abs_shap.sum()
+    )
 
     if total > 0:
-        normalized = mean_abs_shap / total
+
+        normalized = (
+            mean_abs_shap / total
+        )
+
     else:
+
         normalized = mean_abs_shap
 
     # --------------------------------------------------------
@@ -189,9 +297,13 @@ def get_global_feature_importance(
         normalized
     ):
 
-        original_name = _get_original_feature(name)
+        original_name = _get_original_feature(
+            name
+        )
 
-        grouped_importance[original_name] = (
+        grouped_importance[
+            original_name
+        ] = (
             grouped_importance.get(
                 original_name,
                 0.0
@@ -208,6 +320,7 @@ def get_global_feature_importance(
     for feature, value in grouped_importance.items():
 
         results.append({
+
             "feature": feature,
 
             "display_name": (
@@ -223,7 +336,10 @@ def get_global_feature_importance(
             )
         })
 
-    # Highest importance first
+    # --------------------------------------------------------
+    # SORT
+    # --------------------------------------------------------
+
     results.sort(
         key=lambda x: x["importance"],
         reverse=True
@@ -232,9 +348,9 @@ def get_global_feature_importance(
     return results
 
 
-# ------------------------------------------------------------
+# ============================================================
 # LOCAL PATIENT RISK EXPLANATION
-# ------------------------------------------------------------
+# ============================================================
 
 def explain_patient_risk(
     patient_df: pd.DataFrame,
@@ -245,23 +361,6 @@ def explain_patient_risk(
 ) -> Dict[str, Any]:
     """
     Generates a local SHAP explanation for one patient.
-
-    Parameters
-    ----------
-    patient_df:
-        Raw patient input as a pandas DataFrame.
-
-    preprocessor:
-        Same preprocessing pipeline used during training.
-
-    model:
-        Trained classification model.
-
-    feature_names:
-        Names of transformed model features.
-
-    background_data:
-        Transformed SHAP background dataset.
     """
 
     # --------------------------------------------------------
@@ -269,32 +368,48 @@ def explain_patient_risk(
     # --------------------------------------------------------
 
     if background_data is None:
+
         raise ValueError(
             "background_data is required for SHAP "
             "patient explanations."
         )
 
     if patient_df is None or patient_df.empty:
+
         raise ValueError(
             "patient_df cannot be empty."
         )
 
     if preprocessor is None:
+
         raise ValueError(
             "preprocessor is required."
         )
 
     if model is None:
+
         raise ValueError(
             "model is required."
+        )
+
+    if feature_names is None:
+
+        raise ValueError(
+            "feature_names is required."
         )
 
     # --------------------------------------------------------
     # TRANSFORM PATIENT DATA
     # --------------------------------------------------------
 
-    patient_transformed = preprocessor.transform(
-        patient_df
+    patient_transformed = (
+        preprocessor.transform(
+            patient_df
+        )
+    )
+
+    patient_transformed = np.asarray(
+        patient_transformed
     )
 
     # --------------------------------------------------------
@@ -314,13 +429,13 @@ def explain_patient_risk(
     # --------------------------------------------------------
 
     explainer = _get_shap_explainer(
-        model,
-        background_data,
-        feature_names
+        model=model,
+        background_data=background_data,
+        feature_names=feature_names
     )
 
     # --------------------------------------------------------
-    # CALCULATE SHAP VALUES
+    # CALCULATE PATIENT SHAP VALUES
     # --------------------------------------------------------
 
     shap_output = explainer(
@@ -346,11 +461,22 @@ def explain_patient_risk(
 
         # Safety check
         if index >= len(patient_shap):
+
             break
 
-        original_feature = _get_original_feature(
-            transformed_name
+        # ----------------------------------------------------
+        # ORIGINAL FEATURE
+        # ----------------------------------------------------
+
+        original_feature = (
+            _get_original_feature(
+                transformed_name
+            )
         )
+
+        # ----------------------------------------------------
+        # SHAP IMPACT
+        # ----------------------------------------------------
 
         impact = float(
             patient_shap[index]
@@ -375,13 +501,23 @@ def explain_patient_risk(
         # ----------------------------------------------------
 
         if impact > 0:
+
             effect = "Increases Risk"
+
         elif impact < 0:
+
             effect = "Decreases Risk"
+
         else:
+
             effect = "No Significant Effect"
 
+        # ----------------------------------------------------
+        # ADD CONTRIBUTION
+        # ----------------------------------------------------
+
         contributions.append({
+
             "feature": original_feature,
 
             "display_name": (
@@ -391,7 +527,9 @@ def explain_patient_risk(
                 )
             ),
 
-            "value": str(raw_value),
+            "value": str(
+                raw_value
+            ),
 
             "impact": round(
                 impact,
@@ -401,9 +539,9 @@ def explain_patient_risk(
             "effect": effect
         })
 
-    # --------------------------------------------------------
+    # ========================================================
     # GROUP ONE-HOT FEATURES
-    # --------------------------------------------------------
+    # ========================================================
 
     grouped = {}
 
@@ -414,18 +552,21 @@ def explain_patient_risk(
         if feature not in grouped:
 
             grouped[feature] = {
+
                 "feature": feature,
 
-                "display_name": item[
-                    "display_name"
-                ],
+                "display_name": (
+                    item["display_name"]
+                ),
 
                 "value": item["value"],
 
                 "impact": 0.0
             }
 
-        grouped[feature]["impact"] += (
+        grouped[
+            feature
+        ]["impact"] += (
             item["impact"]
         )
 
@@ -433,9 +574,9 @@ def explain_patient_risk(
         grouped.values()
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # UPDATE EFFECT AFTER GROUPING
-    # --------------------------------------------------------
+    # ========================================================
 
     for item in contributions:
 
@@ -462,9 +603,9 @@ def explain_patient_risk(
                 "No Significant Effect"
             )
 
-    # --------------------------------------------------------
+    # ========================================================
     # SORT BY ABSOLUTE IMPACT
-    # --------------------------------------------------------
+    # ========================================================
 
     contributions.sort(
         key=lambda x: abs(
@@ -473,9 +614,9 @@ def explain_patient_risk(
         reverse=True
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # RISK CATEGORY
-    # --------------------------------------------------------
+    # ========================================================
 
     if risk_proba < config.RISK_LOW_MAX:
 
@@ -503,9 +644,9 @@ def explain_patient_risk(
 
         risk_color = "#ef4444"
 
-    # --------------------------------------------------------
+    # ========================================================
     # FINAL RESPONSE
-    # --------------------------------------------------------
+    # ========================================================
 
     return {
 
@@ -523,7 +664,11 @@ def explain_patient_risk(
 
         "risk_color": risk_color,
 
-        "top_drivers": contributions[:6],
+        "top_drivers": (
+            contributions[:6]
+        ),
 
-        "all_contributions": contributions
+        "all_contributions": (
+            contributions
+        )
     }
