@@ -360,22 +360,8 @@ def get_loaded_artifacts():
 
 @app.on_event("startup")
 def startup_event():
-
-    try:
-
-        get_loaded_artifacts()
-
-        print(
-            "[INFO] MedPulse AI startup completed successfully."
-        )
-
-    except Exception as e:
-
-        print(
-            "[ERROR] Startup artifact loading failed: "
-            f"{e}"
-        )
-
+    print("[INFO] MedPulse AI API started successfully.")
+    print("[INFO] Model artifacts will be loaded when required.")
 
 # =========================================================
 # PATIENT INPUT MODEL
