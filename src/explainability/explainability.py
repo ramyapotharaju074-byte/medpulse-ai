@@ -1,177 +1,229 @@
+import sys
+from pathlib import Path
+from typing import Dict, Any, List
+
 import numpy as np
 import pandas as pd
 import shap
 
-from typing import Dict, Any, List
-from pathlib import Path
-import sys
 
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
+# ------------------------------------------------------------
+# PROJECT PATH
+# ------------------------------------------------------------
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
 
 from src import config
 
 
-# ============================================================
-# Feature Name Mapping
-# ============================================================
+# ------------------------------------------------------------
+# FEATURE NAME MAPPING
+# ------------------------------------------------------------
 
 def _get_original_feature(feature_name: str) -> str:
     """
-    Maps transformed feature names back to their original
-    human-readable feature names.
+    Maps transformed feature names back to their
+    original human-readable feature names.
     """
 
     for original in config.FEATURE_COLUMNS:
 
-        if (
-            feature_name == original
-            or feature_name.startswith(f"num__{original}")
-            or feature_name.startswith(f"cat__{original}")
-        ):
+        if feature_name == original:
+            return original
+
+        if feature_name.startswith(f"num__{original}"):
+            return original
+
+        if feature_name.startswith(f"cat__{original}"):
             return original
 
     return feature_name
 
 
-# ============================================================
-# Global Feature Importance
-# ============================================================
+# ------------------------------------------------------------
+# SHAP EXPLAINER
+# ------------------------------------------------------------
+
+def _get_shap_explainer(
+    model,
+    background_data,
+    feature_names
+):
+    """
+    Creates a SHAP explainer for the trained model.
+
+    The background data must already be transformed using
+    the same preprocessing pipeline used during training.
+    """
+
+    if background_data is None:
+        raise ValueError(
+            "background_data is required for SHAP explanations."
+        )
+
+    return shap.Explainer(
+        model,
+        background_data,
+        feature_names=feature_names
+    )
+
+
+# ------------------------------------------------------------
+# SAFE SHAP VALUE EXTRACTION
+# ------------------------------------------------------------
+
+def _extract_shap_values(
+    shap_output,
+    class_index: int = 1
+):
+    """
+    Extracts SHAP values for the positive/risk class.
+
+    Handles different SHAP output shapes:
+        (samples, features)
+        (samples, features, classes)
+    """
+
+    values = shap_output.values
+
+    if isinstance(values, list):
+        if len(values) > class_index:
+            values = values[class_index]
+        else:
+            values = values[0]
+
+    values = np.asarray(values)
+
+    if values.ndim == 3:
+        return values[:, :, class_index]
+
+    if values.ndim == 2:
+        return values
+
+    raise ValueError(
+        f"Unexpected SHAP output shape: {values.shape}"
+    )
+
+
+# ------------------------------------------------------------
+# GLOBAL FEATURE IMPORTANCE
+# ------------------------------------------------------------
 
 def get_global_feature_importance(
     model,
-    feature_names: List[str],
+    preprocessor=None,
+    feature_names: List[str] = None,
     background_data=None
 ) -> List[Dict[str, Any]]:
     """
-    Calculates global feature importance using the trained model.
+    Computes global feature importance using mean absolute
+    SHAP values.
 
-    Supports tree-based models, linear models, and calibrated
-    classifiers.
+    Parameters
+    ----------
+    model:
+        Trained classification model.
 
-    background_data is accepted for compatibility with the
-    explainability API.
+    preprocessor:
+        Training preprocessing pipeline.
+        Kept for API compatibility.
+
+    feature_names:
+        Names of transformed features.
+
+    background_data:
+        Transformed background dataset.
     """
 
-    # --------------------------------------------------------
-    # Obtain model feature importance
-    # --------------------------------------------------------
-
-    if hasattr(model, "feature_importances_"):
-
-        importances = np.asarray(
-            model.feature_importances_
+    if background_data is None:
+        raise ValueError(
+            "background_data is required for SHAP "
+            "global explanations."
         )
 
-    elif hasattr(model, "coef_"):
-
-        importances = np.abs(
-            np.asarray(model.coef_[0])
+    if feature_names is None:
+        raise ValueError(
+            "feature_names is required for SHAP "
+            "global explanations."
         )
 
-    elif hasattr(model, "calibrated_classifiers_"):
+    # Create SHAP explainer
+    explainer = _get_shap_explainer(
+        model,
+        background_data,
+        feature_names
+    )
 
-        base_clf = (
-            model.calibrated_classifiers_[0].estimator
-        )
+    # Calculate SHAP values
+    shap_output = explainer(background_data)
 
-        if hasattr(base_clf, "coef_"):
+    # Extract positive/risk-class SHAP values
+    values = _extract_shap_values(
+        shap_output,
+        class_index=1
+    )
 
-            importances = np.abs(
-                np.asarray(base_clf.coef_[0])
-            )
+    # Mean absolute SHAP value
+    mean_abs_shap = np.abs(values).mean(axis=0)
 
-        elif hasattr(base_clf, "feature_importances_"):
-
-            importances = np.asarray(
-                base_clf.feature_importances_
-            )
-
-        else:
-
-            importances = np.ones(
-                len(feature_names)
-            )
-
-    else:
-
-        importances = np.ones(
-            len(feature_names)
-        )
-
-    # --------------------------------------------------------
-    # Make sure feature count matches
-    # --------------------------------------------------------
-
-    if len(importances) != len(feature_names):
-
-        importances = np.resize(
-            importances,
-            len(feature_names)
-        )
-
-    # --------------------------------------------------------
     # Normalize importance
-    # --------------------------------------------------------
-
-    total = np.sum(importances)
+    total = float(mean_abs_shap.sum())
 
     if total > 0:
-
-        importances = importances / total
+        normalized = mean_abs_shap / total
+    else:
+        normalized = mean_abs_shap
 
     # --------------------------------------------------------
-    # Group one-hot encoded features
+    # GROUP TRANSFORMED FEATURES
     # --------------------------------------------------------
 
-    feature_impacts = {}
+    grouped_importance = {}
 
     for name, importance in zip(
         feature_names,
-        importances
+        normalized
     ):
 
-        base_feature = _get_original_feature(
-            name
-        )
+        original_name = _get_original_feature(name)
 
-        feature_impacts[base_feature] = (
-            feature_impacts.get(
-                base_feature,
+        grouped_importance[original_name] = (
+            grouped_importance.get(
+                original_name,
                 0.0
             )
             + float(importance)
         )
 
     # --------------------------------------------------------
-    # Build response
+    # CREATE RESPONSE
     # --------------------------------------------------------
 
-    results = [
+    results = []
 
-        {
+    for feature, value in grouped_importance.items():
+
+        results.append({
             "feature": feature,
 
-            "display_name":
+            "display_name": (
                 config.FEATURE_DISPLAY_NAMES.get(
                     feature,
                     feature
-                ),
-
-            "importance":
-                round(
-                    importance * 100,
-                    2
                 )
-        }
+            ),
 
-        for feature, importance
-        in feature_impacts.items()
-    ]
+            "importance": round(
+                float(value) * 100,
+                2
+            )
+        })
 
-    # --------------------------------------------------------
-    # Sort descending
-    # --------------------------------------------------------
-
+    # Highest importance first
     results.sort(
         key=lambda x: x["importance"],
         reverse=True
@@ -180,9 +232,9 @@ def get_global_feature_importance(
     return results
 
 
-# ============================================================
-# Local SHAP Explanation
-# ============================================================
+# ------------------------------------------------------------
+# LOCAL PATIENT RISK EXPLANATION
+# ------------------------------------------------------------
 
 def explain_patient_risk(
     patient_df: pd.DataFrame,
@@ -192,285 +244,226 @@ def explain_patient_risk(
     background_data=None
 ) -> Dict[str, Any]:
     """
-    Computes a local SHAP explanation for one patient.
+    Generates a local SHAP explanation for one patient.
 
-    background_data must be in the same transformed feature
-    space as the model input.
+    Parameters
+    ----------
+    patient_df:
+        Raw patient input as a pandas DataFrame.
+
+    preprocessor:
+        Same preprocessing pipeline used during training.
+
+    model:
+        Trained classification model.
+
+    feature_names:
+        Names of transformed model features.
+
+    background_data:
+        Transformed SHAP background dataset.
     """
 
     # --------------------------------------------------------
-    # Validate background data
+    # VALIDATION
     # --------------------------------------------------------
 
     if background_data is None:
-
         raise ValueError(
-            "SHAP background data is required."
+            "background_data is required for SHAP "
+            "patient explanations."
+        )
+
+    if patient_df is None or patient_df.empty:
+        raise ValueError(
+            "patient_df cannot be empty."
+        )
+
+    if preprocessor is None:
+        raise ValueError(
+            "preprocessor is required."
+        )
+
+    if model is None:
+        raise ValueError(
+            "model is required."
         )
 
     # --------------------------------------------------------
-    # Transform patient data
+    # TRANSFORM PATIENT DATA
     # --------------------------------------------------------
 
-    patient_transformed = (
-        preprocessor.transform(
-            patient_df
-        )
+    patient_transformed = preprocessor.transform(
+        patient_df
     )
 
     # --------------------------------------------------------
-    # Predict risk probability
+    # PREDICT CARDIAC RISK
     # --------------------------------------------------------
 
-    try:
+    probabilities = model.predict_proba(
+        patient_transformed
+    )
 
-        risk_proba = float(
-            model.predict_proba(
-                patient_transformed
-            )[0, 1]
-        )
-
-    except Exception as e:
-
-        raise ValueError(
-            f"Model prediction failed: {str(e)}"
-        )
+    risk_proba = float(
+        probabilities[0, 1]
+    )
 
     # --------------------------------------------------------
-    # Calculate SHAP values
+    # SHAP EXPLAINER
     # --------------------------------------------------------
 
-    try:
-
-        model_name = type(model).__name__
-
-        # ----------------------------------------------------
-        # Tree-based models
-        # ----------------------------------------------------
-
-        if (
-            hasattr(
-                model,
-                "feature_importances_"
-            )
-            or "RandomForest" in model_name
-            or "GradientBoosting" in model_name
-            or "XGB" in model_name
-            or "LGBM" in model_name
-        ):
-
-            explainer = shap.TreeExplainer(
-                model
-            )
-
-            shap_output = explainer.shap_values(
-                patient_transformed
-            )
-
-        # ----------------------------------------------------
-        # General / Linear / Calibrated models
-        # ----------------------------------------------------
-
-        else:
-
-            explainer = shap.Explainer(
-                model.predict_proba,
-                background_data
-            )
-
-            shap_output = explainer(
-                patient_transformed
-            )
-
-            if hasattr(
-                shap_output,
-                "values"
-            ):
-
-                shap_output = (
-                    shap_output.values
-                )
-
-        # ----------------------------------------------------
-        # Normalize SHAP output shape
-        # ----------------------------------------------------
-
-        if isinstance(
-            shap_output,
-            list
-        ):
-
-            # Older SHAP binary classification format
-            if len(shap_output) > 1:
-
-                shap_vec = (
-                    shap_output[1][0]
-                )
-
-            else:
-
-                shap_vec = (
-                    shap_output[0][0]
-                )
-
-        elif isinstance(
-            shap_output,
-            np.ndarray
-        ):
-
-            if shap_output.ndim == 3:
-
-                # samples, features, classes
-                shap_vec = (
-                    shap_output[0, :, 1]
-                )
-
-            elif shap_output.ndim == 2:
-
-                shap_vec = (
-                    shap_output[0]
-                )
-
-            else:
-
-                shap_vec = shap_output
-
-        else:
-
-            shap_vec = np.zeros(
-                len(feature_names)
-            )
-
-    except Exception as e:
-
-        print(
-            f"[!] SHAP calculation fallback: {e}"
-        )
-
-        # ----------------------------------------------------
-        # Fallback for linear models
-        # ----------------------------------------------------
-
-        if hasattr(model, "coef_"):
-
-            shap_vec = (
-                np.asarray(
-                    model.coef_[0]
-                )
-                * np.asarray(
-                    patient_transformed[0]
-                )
-            )
-
-        else:
-
-            shap_vec = np.zeros(
-                len(feature_names)
-            )
+    explainer = _get_shap_explainer(
+        model,
+        background_data,
+        feature_names
+    )
 
     # --------------------------------------------------------
-    # Make sure SHAP vector has correct length
+    # CALCULATE SHAP VALUES
     # --------------------------------------------------------
 
-    shap_vec = np.asarray(
-        shap_vec
-    ).flatten()
+    shap_output = explainer(
+        patient_transformed
+    )
 
-    if len(shap_vec) != len(feature_names):
+    patient_values = _extract_shap_values(
+        shap_output,
+        class_index=1
+    )
 
-        shap_vec = np.resize(
-            shap_vec,
-            len(feature_names)
-        )
-
-    # --------------------------------------------------------
-    # Group SHAP values by original feature
-    # --------------------------------------------------------
-
-    feature_shap_map = {}
-
-    for feature_name, shap_value in zip(
-        feature_names,
-        shap_vec
-    ):
-
-        original_feature = (
-            _get_original_feature(
-                feature_name
-            )
-        )
-
-        feature_shap_map[
-            original_feature
-        ] = (
-            feature_shap_map.get(
-                original_feature,
-                0.0
-            )
-            + float(shap_value)
-        )
+    patient_shap = patient_values[0]
 
     # --------------------------------------------------------
-    # Build patient contribution list
+    # CREATE CONTRIBUTIONS
     # --------------------------------------------------------
 
     contributions = []
 
-    for original_feature in (
-        config.FEATURE_COLUMNS
+    for index, transformed_name in enumerate(
+        feature_names
     ):
+
+        # Safety check
+        if index >= len(patient_shap):
+            break
+
+        original_feature = _get_original_feature(
+            transformed_name
+        )
+
+        impact = float(
+            patient_shap[index]
+        )
+
+        # ----------------------------------------------------
+        # ORIGINAL PATIENT VALUE
+        # ----------------------------------------------------
 
         if original_feature in patient_df.columns:
 
-            value = patient_df[
+            raw_value = patient_df[
                 original_feature
             ].iloc[0]
 
         else:
 
-            value = "N/A"
+            raw_value = "N/A"
 
-        shap_value = feature_shap_map.get(
-            original_feature,
-            0.0
-        )
+        # ----------------------------------------------------
+        # EFFECT
+        # ----------------------------------------------------
 
-        display_name = (
-            config.FEATURE_DISPLAY_NAMES.get(
-                original_feature,
-                original_feature
-            )
-        )
+        if impact > 0:
+            effect = "Increases Risk"
+        elif impact < 0:
+            effect = "Decreases Risk"
+        else:
+            effect = "No Significant Effect"
 
-        contributions.append(
-            {
-                "feature": original_feature,
+        contributions.append({
+            "feature": original_feature,
 
-                "display_name": display_name,
-
-                "value": (
-                    str(value)
-                    if pd.notna(value)
-                    else "N/A"
-                ),
-
-                "impact": round(
-                    float(shap_value),
-                    6
-                ),
-
-                "effect": (
-                    "Increases Risk"
-                    if shap_value > 0
-                    else "Decreases Risk"
-                    if shap_value < 0
-                    else"No Significant Impact"
+            "display_name": (
+                config.FEATURE_DISPLAY_NAMES.get(
+                    original_feature,
+                    original_feature
                 )
-            }
-        )
+            ),
+
+            "value": str(raw_value),
+
+            "impact": round(
+                impact,
+                6
+            ),
+
+            "effect": effect
+        })
 
     # --------------------------------------------------------
-    # Sort by absolute SHAP impact
+    # GROUP ONE-HOT FEATURES
+    # --------------------------------------------------------
+
+    grouped = {}
+
+    for item in contributions:
+
+        feature = item["feature"]
+
+        if feature not in grouped:
+
+            grouped[feature] = {
+                "feature": feature,
+
+                "display_name": item[
+                    "display_name"
+                ],
+
+                "value": item["value"],
+
+                "impact": 0.0
+            }
+
+        grouped[feature]["impact"] += (
+            item["impact"]
+        )
+
+    contributions = list(
+        grouped.values()
+    )
+
+    # --------------------------------------------------------
+    # UPDATE EFFECT AFTER GROUPING
+    # --------------------------------------------------------
+
+    for item in contributions:
+
+        item["impact"] = round(
+            float(item["impact"]),
+            6
+        )
+
+        if item["impact"] > 0:
+
+            item["effect"] = (
+                "Increases Risk"
+            )
+
+        elif item["impact"] < 0:
+
+            item["effect"] = (
+                "Decreases Risk"
+            )
+
+        else:
+
+            item["effect"] = (
+                "No Significant Effect"
+            )
+
+    # --------------------------------------------------------
+    # SORT BY ABSOLUTE IMPACT
     # --------------------------------------------------------
 
     contributions.sort(
@@ -481,13 +474,10 @@ def explain_patient_risk(
     )
 
     # --------------------------------------------------------
-    # Risk Category
+    # RISK CATEGORY
     # --------------------------------------------------------
 
-    if (
-        risk_proba
-        < config.RISK_LOW_MAX
-    ):
+    if risk_proba < config.RISK_LOW_MAX:
 
         risk_category = (
             "Low Cardiac Risk"
@@ -495,10 +485,7 @@ def explain_patient_risk(
 
         risk_color = "#10b981"
 
-    elif (
-        risk_proba
-        < config.RISK_MODERATE_MAX
-    ):
+    elif risk_proba < config.RISK_MODERATE_MAX:
 
         risk_category = (
             "Moderate Risk "
@@ -517,32 +504,26 @@ def explain_patient_risk(
         risk_color = "#ef4444"
 
     # --------------------------------------------------------
-    # Final response
+    # FINAL RESPONSE
     # --------------------------------------------------------
 
     return {
 
-        "risk_probability":
-            round(
-                risk_proba,
-                4
-            ),
+        "risk_probability": round(
+            risk_proba,
+            4
+        ),
 
-        "risk_percentage":
-            round(
-                risk_proba * 100,
-                1
-            ),
+        "risk_percentage": round(
+            risk_proba * 100,
+            1
+        ),
 
-        "risk_category":
-            risk_category,
+        "risk_category": risk_category,
 
-        "risk_color":
-            risk_color,
+        "risk_color": risk_color,
 
-        "top_drivers":
-            contributions[:6],
+        "top_drivers": contributions[:6],
 
-        "all_contributions":
-            contributions
+        "all_contributions": contributions
     }

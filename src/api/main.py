@@ -4,8 +4,8 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from typing import Dict, Any, List, Optional
 from pathlib import Path
+from typing import Dict, Any, List, Optional
 
 from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,18 +13,21 @@ from pydantic import BaseModel, Field
 
 import sys
 
-# ---------------------------------------------------------
-# Add project root to Python path
-# ---------------------------------------------------------
+
+# =========================================================
+# PROJECT ROOT
+# =========================================================
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
 
 
-# ---------------------------------------------------------
-# Project imports
-# ---------------------------------------------------------
+# =========================================================
+# PROJECT IMPORTS
+# =========================================================
+
 from src import config
 
 from src.data.preprocessing import (
@@ -64,10 +67,11 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
 
-    # Frontend development URLs
     allow_origins=[
         "http://localhost:3000",
-        "http://127.0.0.1:3000"
+        "http://127.0.0.1:3000",
+        "http://localhost:5000",
+        "http://127.0.0.1:5000"
     ],
 
     allow_credentials=True,
@@ -83,15 +87,11 @@ app.add_middleware(
 # =========================================================
 
 preprocessor = None
-
 champion_model = None
-
 feature_names = []
-
 baseline_df = None
 
-# IMPORTANT:
-# SHAP requires representative background/reference data.
+# SHAP representative background/reference data
 background_data = None
 
 
@@ -109,10 +109,6 @@ def get_loaded_artifacts():
         3. Transformed feature names
         4. Baseline/raw dataset
         5. SHAP background data
-
-    The SHAP background data is created from a representative
-    sample of the raw dataset and transformed using the SAME
-    preprocessing pipeline used during model training.
     """
 
     global preprocessor
@@ -122,7 +118,7 @@ def get_loaded_artifacts():
     global background_data
 
     # -----------------------------------------------------
-    # Avoid loading everything repeatedly
+    # Avoid loading repeatedly
     # -----------------------------------------------------
 
     if (
@@ -151,7 +147,6 @@ def get_loaded_artifacts():
             "[INFO] Preprocessor loaded successfully."
         )
 
-
         # =================================================
         # 2. LOAD CHAMPION MODEL
         # =================================================
@@ -162,18 +157,14 @@ def get_loaded_artifacts():
         )
 
         if not model_path.exists():
-
             raise FileNotFoundError(
                 "Champion model not found at: "
                 f"{model_path}"
             )
 
-        champion_model = joblib.load(
-            model_path
-        )
+        champion_model = joblib.load(model_path)
 
         if champion_model is None:
-
             raise RuntimeError(
                 "Champion model was loaded as None."
             )
@@ -182,22 +173,18 @@ def get_loaded_artifacts():
             "[INFO] Champion model loaded successfully."
         )
 
-
         # =================================================
-        # 3. GET TRANSFORMED FEATURE NAMES
+        # 3. GET FEATURE NAMES
         # =================================================
 
-        feature_names = (
-            get_transformed_feature_names(
-                preprocessor
-            )
+        feature_names = get_transformed_feature_names(
+            preprocessor
         )
 
         if (
             feature_names is None
             or len(feature_names) == 0
         ):
-
             raise RuntimeError(
                 "Could not obtain transformed feature names."
             )
@@ -207,13 +194,11 @@ def get_loaded_artifacts():
             f"{len(feature_names)}"
         )
 
-
         # =================================================
-        # 4. LOAD RAW / BASELINE DATASET
+        # 4. LOAD RAW DATASET
         # =================================================
 
         if not config.RAW_DATA_PATH.exists():
-
             raise FileNotFoundError(
                 "Raw medical dataset not found at: "
                 f"{config.RAW_DATA_PATH}"
@@ -224,7 +209,6 @@ def get_loaded_artifacts():
         )
 
         if baseline_df.empty:
-
             raise RuntimeError(
                 "The raw medical dataset is empty."
             )
@@ -235,9 +219,8 @@ def get_loaded_artifacts():
             f"{len(baseline_df.columns)} columns."
         )
 
-
         # =================================================
-        # 5. CHECK REQUIRED FEATURE COLUMNS
+        # 5. CHECK FEATURE COLUMNS
         # =================================================
 
         missing_columns = [
@@ -247,18 +230,15 @@ def get_loaded_artifacts():
         ]
 
         if missing_columns:
-
             raise ValueError(
                 "Required feature columns are missing "
                 f"from the dataset: {missing_columns}"
             )
 
-
         # =================================================
         # 6. CREATE SHAP BACKGROUND DATA
         # =================================================
 
-        # Select at most 100 representative samples.
         background_raw = (
             baseline_df[
                 config.FEATURE_COLUMNS
@@ -274,7 +254,6 @@ def get_loaded_artifacts():
         )
 
         if background_raw.empty:
-
             raise RuntimeError(
                 "SHAP background dataset could not be created."
             )
@@ -284,23 +263,15 @@ def get_loaded_artifacts():
             f"{len(background_raw)}"
         )
 
-
         # =================================================
         # 7. APPLY SAME PREPROCESSING
         # =================================================
 
-        # IMPORTANT:
-        # The background data must be transformed using
-        # the SAME preprocessor used during model training.
-
-        background_data = (
-            preprocessor.transform(
-                background_raw
-            )
+        background_data = preprocessor.transform(
+            background_raw
         )
 
         if background_data is None:
-
             raise RuntimeError(
                 "SHAP background data transformation failed."
             )
@@ -309,25 +280,21 @@ def get_loaded_artifacts():
             "[INFO] SHAP background data prepared successfully."
         )
 
-
         # =================================================
         # 8. FINAL VALIDATION
         # =================================================
 
         if preprocessor is None:
-
             raise RuntimeError(
                 "Preprocessor validation failed."
             )
 
         if champion_model is None:
-
             raise RuntimeError(
                 "Champion model validation failed."
             )
 
         if background_data is None:
-
             raise RuntimeError(
                 "SHAP background data validation failed."
             )
@@ -335,11 +302,6 @@ def get_loaded_artifacts():
         print(
             "[INFO] All MedPulse AI artifacts loaded successfully."
         )
-
-
-    # =====================================================
-    # FILE ERROR
-    # =====================================================
 
     except FileNotFoundError as e:
 
@@ -357,11 +319,6 @@ def get_loaded_artifacts():
             f"Required MedPulse AI file is missing: {e}"
         ) from e
 
-
-    # =====================================================
-    # DATA / CONFIGURATION ERROR
-    # =====================================================
-
     except ValueError as e:
 
         preprocessor = None
@@ -377,11 +334,6 @@ def get_loaded_artifacts():
         raise RuntimeError(
             f"MedPulse AI data configuration error: {e}"
         ) from e
-
-
-    # =====================================================
-    # GENERAL ERROR
-    # =====================================================
 
     except Exception as e:
 
@@ -402,7 +354,7 @@ def get_loaded_artifacts():
 
 
 # =========================================================
-# STARTUP EVENT
+# STARTUP
 # =========================================================
 
 @app.on_event("startup")
@@ -422,10 +374,6 @@ def startup_event():
             "[ERROR] Startup artifact loading failed: "
             f"{e}"
         )
-
-        # We don't hide the error.
-        # API endpoints will provide an appropriate error
-        # if artifacts are unavailable.
 
 
 # =========================================================
@@ -521,6 +469,35 @@ def read_root():
 
 
 # =========================================================
+# HEALTH CHECK
+# =========================================================
+
+@app.get("/health")
+def health_check():
+
+    try:
+
+        get_loaded_artifacts()
+
+        return {
+            "status": "healthy",
+            "model_loaded": champion_model is not None,
+            "preprocessor_loaded": preprocessor is not None,
+            "shap_background_loaded": background_data is not None
+        }
+
+    except Exception as e:
+
+        return {
+            "status": "unhealthy",
+            "model_loaded": False,
+            "preprocessor_loaded": False,
+            "shap_background_loaded": False,
+            "error": str(e)
+        }
+
+
+# =========================================================
 # SINGLE PATIENT PREDICTION
 # =========================================================
 
@@ -531,18 +508,12 @@ def predict_single_patient(
 
     try:
 
-        # Load artifacts
         get_loaded_artifacts()
-
-        # -------------------------------------------------
-        # Validate model
-        # -------------------------------------------------
 
         if (
             champion_model is None
             or preprocessor is None
         ):
-
             raise HTTPException(
                 status_code=500,
                 detail=(
@@ -550,10 +521,6 @@ def predict_single_patient(
                     "Train pipeline first."
                 )
             )
-
-        # -------------------------------------------------
-        # Validate SHAP background data
-        # -------------------------------------------------
 
         if background_data is None:
 
@@ -565,21 +532,19 @@ def predict_single_patient(
             )
 
         # -------------------------------------------------
-        # Convert patient input to dictionary
+        # Convert patient to dictionary
         # -------------------------------------------------
 
         try:
 
-            # Pydantic v2
             patient_dict = patient.model_dump()
 
         except AttributeError:
 
-            # Pydantic v1 compatibility
             patient_dict = patient.dict()
 
         # -------------------------------------------------
-        # Convert to DataFrame
+        # DataFrame
         # -------------------------------------------------
 
         df_single = pd.DataFrame(
@@ -587,7 +552,7 @@ def predict_single_patient(
         )
 
         # -------------------------------------------------
-        # Verify required columns
+        # Required columns
         # -------------------------------------------------
 
         missing_columns = [
@@ -607,7 +572,7 @@ def predict_single_patient(
             )
 
         # -------------------------------------------------
-        # Generate SHAP explanation
+        # SHAP explanation
         # -------------------------------------------------
 
         explanation = explain_patient_risk(
@@ -617,10 +582,6 @@ def predict_single_patient(
             feature_names,
             background_data
         )
-
-        # -------------------------------------------------
-        # Return result
-        # -------------------------------------------------
 
         return {
             "status": "success",
@@ -658,12 +619,7 @@ async def predict_batch_csv(
 
     try:
 
-        # Load artifacts
         get_loaded_artifacts()
-
-        # -------------------------------------------------
-        # Validate model
-        # -------------------------------------------------
 
         if (
             champion_model is None
@@ -672,14 +628,11 @@ async def predict_batch_csv(
 
             raise HTTPException(
                 status_code=500,
-                detail=(
-                    "Models not loaded. "
-                    "Train pipeline first."
-                )
+                detail="Models not loaded."
             )
 
         # -------------------------------------------------
-        # Validate file name
+        # Validate filename
         # -------------------------------------------------
 
         if not file.filename:
@@ -689,9 +642,7 @@ async def predict_batch_csv(
                 detail="No file was provided."
             )
 
-        if not file.filename.lower().endswith(
-            ".csv"
-        ):
+        if not file.filename.lower().endswith(".csv"):
 
             raise HTTPException(
                 status_code=400,
@@ -699,7 +650,7 @@ async def predict_batch_csv(
             )
 
         # -------------------------------------------------
-        # Read uploaded file
+        # Read file
         # -------------------------------------------------
 
         content = await file.read()
@@ -723,22 +674,18 @@ async def predict_batch_csv(
 
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "CSV file must use UTF-8 encoding."
-                )
+                detail="CSV file must use UTF-8 encoding."
             )
 
         except Exception as e:
 
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    f"Could not read CSV file: {e}"
-                )
+                detail=f"Could not read CSV file: {e}"
             )
 
         # -------------------------------------------------
-        # Check empty dataframe
+        # Empty dataframe
         # -------------------------------------------------
 
         if df_batch.empty:
@@ -749,7 +696,7 @@ async def predict_batch_csv(
             )
 
         # -------------------------------------------------
-        # Verify required feature columns
+        # Required columns
         # -------------------------------------------------
 
         missing_cols = [
@@ -769,34 +716,41 @@ async def predict_batch_csv(
             )
 
         # -------------------------------------------------
-        # Select feature columns
+        # Select features
         # -------------------------------------------------
 
-        batch_features = (
-            df_batch[
-                config.FEATURE_COLUMNS
-            ]
+        batch_features = df_batch[
+            config.FEATURE_COLUMNS
+        ]
+
+        # -------------------------------------------------
+        # Preprocess
+        # -------------------------------------------------
+
+        transformed = preprocessor.transform(
+            batch_features
         )
 
         # -------------------------------------------------
-        # Apply preprocessing
+        # Prediction
         # -------------------------------------------------
 
-        transformed = (
-            preprocessor.transform(
-                batch_features
+        if not hasattr(
+            champion_model,
+            "predict_proba"
+        ):
+
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Champion model does not support "
+                    "probability prediction."
+                )
             )
-        )
 
-        # -------------------------------------------------
-        # Predict probabilities
-        # -------------------------------------------------
-
-        probas = (
-            champion_model.predict_proba(
-                transformed
-            )[:, 1]
-        )
+        probas = champion_model.predict_proba(
+            transformed
+        )[:, 1]
 
         # -------------------------------------------------
         # Prepare results
@@ -808,35 +762,290 @@ async def predict_batch_csv(
         mod_cnt = 0
         high_cnt = 0
 
-        for idx, prob in enumerate(
-            probas
-        ):
+        for index, probability in enumerate(probas):
 
-            prob_val = float(prob)
+            probability = float(probability)
 
-            # ---------------------------------------------
-            # Risk classification
-            # ---------------------------------------------
+            percentage = probability * 100.0
 
-            if (
-                prob_val
-                < config.RISK_LOW_MAX
-            ):
+            if probability < 0.30:
 
-                category = "Low Risk"
+                risk_level = "Low"
                 low_cnt += 1
 
-            elif (
-                prob_val
-                < config.RISK_MODERATE_MAX
-            ):
+            elif probability < 0.70:
 
-                category = "Moderate Risk"
+                risk_level = "Moderate"
                 mod_cnt += 1
 
             else:
 
-                category = "High Risk"
+                risk_level = "High"
                 high_cnt += 1
 
-            # ----------
+            results.append(
+                {
+                    "row": int(index + 1),
+                    "risk_probability": round(
+                        probability,
+                        4
+                    ),
+                    "risk_percentage": round(
+                        percentage,
+                        2
+                    ),
+                    "risk_level": risk_level
+                }
+            )
+
+        return {
+            "status": "success",
+            "total_records": len(results),
+            "summary": {
+                "low_risk": low_cnt,
+                "moderate_risk": mod_cnt,
+                "high_risk": high_cnt
+            },
+            "results": results
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+
+        print(
+            "[ERROR] Batch prediction failed: "
+            f"{e}"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Batch prediction failed: "
+                f"{str(e)}"
+            )
+        )
+
+
+# =========================================================
+# GLOBAL FEATURE IMPORTANCE
+# =========================================================
+
+@app.get("/api/explain/global")
+def global_explanation():
+
+    try:
+
+        get_loaded_artifacts()
+
+        if (
+            champion_model is None
+            or preprocessor is None
+        ):
+
+            raise HTTPException(
+                status_code=500,
+                detail="Models not loaded."
+            )
+
+        if background_data is None:
+
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "SHAP background data is not loaded."
+                )
+            )
+
+        # -------------------------------------------------
+        # Calculate global importance
+        # -------------------------------------------------
+
+        importance = get_global_feature_importance(
+            champion_model,
+            preprocessor,
+            feature_names,
+            background_data
+        )
+
+        return {
+            "status": "success",
+            "global_feature_importance": importance
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+
+        print(
+            "[ERROR] Global explanation failed: "
+            f"{e}"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Global explanation failed: "
+                f"{str(e)}"
+            )
+        )
+
+
+# =========================================================
+# DRIFT MONITORING
+# =========================================================
+
+@app.post("/api/drift")
+async def dataset_drift(
+    file: UploadFile = File(...)
+):
+
+    try:
+
+        get_loaded_artifacts()
+
+        if baseline_df is None:
+
+            raise HTTPException(
+                status_code=500,
+                detail="Baseline dataset is not loaded."
+            )
+
+        if not file.filename:
+
+            raise HTTPException(
+                status_code=400,
+                detail="No file was provided."
+            )
+
+        if not file.filename.lower().endswith(".csv"):
+
+            raise HTTPException(
+                status_code=400,
+                detail="File must be a CSV format."
+            )
+
+        content = await file.read()
+
+        if not content:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Uploaded CSV file is empty."
+            )
+
+        try:
+
+            current_df = pd.read_csv(
+                io.StringIO(
+                    content.decode("utf-8")
+                )
+            )
+
+        except Exception as e:
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Could not read CSV file: {e}"
+                )
+            )
+
+        if current_df.empty:
+
+            raise HTTPException(
+                status_code=400,
+                detail="Uploaded dataset is empty."
+            )
+
+        # -------------------------------------------------
+        # Run existing drift monitor
+        # -------------------------------------------------
+
+        try:
+
+            drift_result = analyze_dataset_drift(
+                baseline_df,
+                current_df
+            )
+
+        except TypeError:
+
+            # Compatibility with implementations that
+            # expect only feature columns.
+            drift_result = analyze_dataset_drift(
+                baseline_df[
+                    config.FEATURE_COLUMNS
+                ],
+                current_df[
+                    config.FEATURE_COLUMNS
+                ]
+            )
+
+        return {
+            "status": "success",
+            "drift_analysis": drift_result
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+
+        print(
+            "[ERROR] Drift analysis failed: "
+            f"{e}"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Drift analysis failed: "
+                f"{str(e)}"
+            )
+        )
+
+
+# =========================================================
+# API INFORMATION
+# =========================================================
+
+@app.get("/api/info")
+def api_info():
+
+    return {
+        "project": "MedPulse AI",
+        "version": "1.0.0",
+        "description": (
+            "Clinical Cardiac Risk Prediction, "
+            "Explainable AI and MLOps Drift Monitoring"
+        ),
+        "endpoints": [
+            "/",
+            "/health",
+            "/api/info",
+            "/api/predict",
+            "/api/predict-batch",
+            "/api/explain/global",
+            "/api/drift",
+            "/docs"
+        ]
+    }
+
+
+# =========================================================
+# LOCAL DEVELOPMENT
+# =========================================================
+
+if __name__ == "__main__":
+
+    import uvicorn
+
+    uvicorn.run(
+        "src.api.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True
+    )
