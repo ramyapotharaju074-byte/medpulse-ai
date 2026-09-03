@@ -90,15 +90,6 @@ def train_and_compare_models(data_dict: Dict[str, Any]) -> Dict[str, Any]:
         "best_cv_auc": float(best_auc),
         "models_evaluated": list(models.keys())
     }
-    with open(config.MODELS_DIR / "model_metadata.json", "w") as f:
-        json.dump(meta, f, indent=2)
-
-    return {
-        "results": results,
-        "trained_models": trained_models,
-        "best_model_name": best_model_name,
-        "meta": meta
-    }
 
 def run_full_training_pipeline():
     """
